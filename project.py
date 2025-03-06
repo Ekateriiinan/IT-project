@@ -29,14 +29,14 @@ def start(message):
 #     if callback.data == 'delete':
 #         bot.delete_message(callback.message.chat.id, callback.message.message_id)
 
-# @bot.message_handler(commands=['start'])
-# def main(message): #информация про пользователя и чат 
-#     bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name}!')
+@bot.message_handler(commands=['start'])
+def main(message): #информация про пользователя и чат 
+    bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name}!')
 
 
-# @bot.message_handler(commands=['mesto']) # открываем сайт 
-# def site(message):
-#     webbrowser.open("https://kudago.com/msk/")
+@bot.message_handler(commands=['mesto']) # открываем сайт 
+def site(message):
+    webbrowser.open("https://kudago.com/msk/")
 
 
 
