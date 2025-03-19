@@ -1,62 +1,37 @@
-import telebot 
-import webbrowser
+import telebot
 from telebot import types
+import sqlite3
 
-bot = telebot.TeleBot('7571918160:AAH0WwDkgK5qhWQQGmC6m-r0SkC-ig9tIp8')
-
-def start(message):
-    markup = types.ReplyKeyboardMarkup()
-    btn1 = types.KeyboardButton("Перейти на сайт")
-    markup.row(btn1)
-    btn2 = types.KeyboardButton("Поставить рейтинг")
-    btn3 = types.KeyboardButton("Написать отзыв")
-    markup.row(btn2, btn3)
-    bot.reply_to(message, 'Перейдите в карты', reply_markup=markup)
-
-
-# @bot.message_handler(content_types=['photo'])
-# def photo(message): #информация про пользователя и чат 
-#     markup = types.InlineKeyboardMarkup()
-#     btn1 = types.InlineKeyboardButton("Перейти на сайт", url='https://yandex.ru/maps/213/moscow/?ll=37.642884%2C55.772239&source=serp_navig&z=10')
-#     markup.row(btn1)
-#     btn2 = types.InlineKeyboardButton("Поставить рейтинг", callback_data='delete')
-#     btn3 = types.InlineKeyboardButton("Написать отзыв", callback_data='рейтинг')
-#     markup.row(btn2, btn3)
-#     bot.reply_to(message, 'Перейдите в карты', reply_markup=markup)
-
-# @bot.add_callback_query_handler(func=lambda callback: True)
-# def callback_messange(callback):
-#     if callback.data == 'delete':
-#         bot.delete_message(callback.message.chat.id, callback.message.message_id)
+bot = telebot.TeleBot("7571918160:AAH0WwDkgK5qhWQQGmC6m-r0SkC-ig9tIp8", parse_mode="MARKDOWN")
 
 @bot.message_handler(commands=['start'])
-def main(message): #информация про пользователя и чат 
-    bot.send_message(message.chat.id, f'Привет, {message.from_user.first_name}!')
+def start(message):
+    #кнопки
+    buttons = types.InlineKeyboardMarkup()
+    left_button = types.InlineKeyboardButton("←", callback_data="None")
+    page_button = types.InlineKeyboardButton("1", callback_data="None")
+    right_button = types.InlineKeyboardButton("→", callback_data="None")
+    buy_button = types.InlineKeyboardButton("Вернуться", callback_data="None")
+    buttons.add(left_button, page_button, right_button)
+    buttons.add(buy_button)
 
+    #подключаемся к БД
+    db_file = "C:/Users/Redmi/OneDrive/Рабочий стол/sql/test1.db"
+    connect = sqlite3.connect(db_file)
+    cursor = connect.cursor()
+    page_query = cursor.execute("SELECT `name`, `text` FROM `mesta` WHERE `id` = 1;")
+    name, text = page_query.fetchone()
+    msg = f"*{name}*\n       Что вас ждет?\n  - {text}" # вывод текста
 
-@bot.message_handler(commands=['mesto']) # открываем сайт 
-def site(message):
-    webbrowser.open("https://kudago.com/msk/")
+    query = "SELECT `photo` FROM `mesta` WHERE id=1" # фото из БД
+    cursor.execute(query)
+    row = cursor.fetchone()
+    a = bytes
+    if row is not None:
+        a = row[0]
 
+    bot.send_photo(message.chat.id, photo=a, caption=msg, reply_markup=buttons)
+    cursor.close()
+    connect.close()
 
-
-bot.polling(non_stop=True)
-
-# @bot.message_handler()
-# def info(message):
-#     if message.text.lower() == 'место':
-#         bot.send_message(message.chat.id, f"Привет {message.from_user.first_name}")
-#     elif message.text.lower() == 'id':
-#         bot.reply_to(message, f'ID:{message.from_user.id}') #ответ на соообщение 
-
-# @bot.message_handler(content_types=['photo'])
-# def get_photo(message): #информация про пользователя и чат 
-#     markup = types.InlineKeyboardMarkup()
-#     markup.add(types.InlineKeyboardButton("Перейти на сайт", url='https://yandex.ru/maps/213/moscow/?ll=37.642884%2C55.772239&source=serp_navig&z=10'))
-
-
-
-# @bot.message_handler(commands=['mesto'])
-# def mesto(message): #информация про пользователя и чат 
-#     bot.send_message(message.chat.id, 'Введите место')
-
+bot.polling(none_stop=True)
