@@ -1,4 +1,5 @@
 import telebot
+from telebot import types
 import sqlite3
 import config
 import requests
@@ -12,9 +13,7 @@ user_data = {}
 
 # Функция для подключения к базе данных
 def get_db_connection():
-    return sqlite3.connect(
-        "/root/telegram_bot/work_bd.db", check_same_thread=False
-    )
+    return sqlite3.connect("C:/Users/Redmi/OneDrive/Рабочий стол/pp/work_bd.db", check_same_thread=False)
 
 
 # Функция регистрации пользователя
@@ -58,7 +57,7 @@ def save_to_db_new_place(user_id):
         )
         data = user_data[user_id]
         cursor.execute(
-            "INSERT INTO places_events (name, type, description) VALUES (?, ?, ?)",
+            "INSERT INTO places_events_na_proverky (name, type, description) VALUES (?, ?, ?)",
             (data["name"], data["type"], data["description"]),
         )
         conn.commit()
@@ -174,7 +173,8 @@ def mark_as_visited(user_id, place_id):
     fav = set(fav_raw[0].split(",")) if fav_raw and fav_raw[0] else set()
     fav.discard(str(place_id))
     cursor.execute(
-        "UPDATE users SET favorites = ? WHERE user_id = ?", (",".join(fav), user_id)
+        "UPDATE users SET favorites = ? WHERE user_id = ?",
+        (",".join(fav), user_id),
     )
     conn.commit()
     conn.close()
@@ -204,7 +204,8 @@ def mark_as_favorite(user_id, place_id):
     fav = set(fav_raw[0].split(",")) if fav_raw and fav_raw[0] else set()
     fav.add(str(place_id))
     cursor.execute(
-        "UPDATE users SET favorites = ? WHERE user_id = ?", (",".join(fav), user_id)
+        "UPDATE users SET favorites = ? WHERE user_id = ?",
+        (",".join(fav), user_id),
     )
     conn.commit()
     conn.close()
@@ -239,10 +240,14 @@ def get_avg_rating(place_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT AVG(score) FROM ratings WHERE place_id = ?", (place_id,))
+    cursor.execute(
+        "SELECT AVG(score) FROM ratings WHERE place_id = ?", (place_id,)
+    )
     avg = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM ratings WHERE place_id = ?", (place_id,))
+    cursor.execute(
+        "SELECT COUNT(*) FROM ratings WHERE place_id = ?", (place_id,)
+    )
     count = cursor.fetchone()[0]
 
     conn.close()
@@ -265,8 +270,8 @@ def handle_start(message):
     markup.add("Добавить место", "Посмотреть избранное")
     bot.send_message(
         message.chat.id,
-        f"Привет, {message.from_user.first_name}. Я помогу подобрать место для досуга.\nЕсли хотите узнать про мероприятие подробнее и получить адрес, то просто напишите <Расскажи про (название места как в карточке)>.",
-        reply_markup=markup,
+        f"Привет, {message.from_user.first_name}! Я помогу подобрать место для досуга.\nЕсли хотите узнать про мероприятие подробнее и получить адрес, то просто напишите <Расскажи про (название места как в карточке)>.",
+        reply_markup=markup
     )
 
 
@@ -311,7 +316,8 @@ def handle_yandex_gpt_request(message):
     except Exception as e:
         print(f"Ошибка при запросе к YandexGPT: {e}")
         bot.reply_to(
-            message, "Произошла ошибка при обработке запроса. Попробуйте позже."
+            message,
+            "Произошла ошибка при обработке запроса. Попробуйте позже.",
         )
 
 
@@ -330,7 +336,14 @@ def handle_find_place(message):
 
 @bot.message_handler(func=lambda m: m.text == "Меню")
 def handle_menu(message):
-    handle_start(message)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Найти место", "Уже был")
+    markup.add("Добавить место", "Посмотреть избранное")
+    bot.send_message(
+        message.chat.id,
+        f"Если хотите узнать про мероприятие подробнее и получить адрес, то просто напишите <Расскажи про (название места как в карточке)>.",
+        reply_markup=markup,
+    )
 
 
 @bot.message_handler(func=lambda m: m.text == "Уже был")
@@ -363,7 +376,9 @@ def handle_view_favorites(message):
         bot.send_message(
             message.chat.id,
             "Избранных мероприятий нет.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("Меню"),
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
         )
         return
     user_state[user_id] = {"view": "favorites", "index": 0}
@@ -393,7 +408,9 @@ def show_was(chat_id, user_id, message_id=None):
         bot.send_message(
             chat_id,
             "Список пуст.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("Меню"),
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
         )
         return
     idx = state["index"] % len(places)
@@ -415,7 +432,10 @@ def show_was(chat_id, user_id, message_id=None):
     if message_id:
         try:
             bot.edit_message_text(
-                chat_id=chat_id, message_id=message_id, text=caption, reply_markup=kb
+                chat_id=chat_id,
+                message_id=message_id,
+                text=caption,
+                reply_markup=kb,
             )
         except:
             bot.send_message(chat_id, caption, reply_markup=kb)
@@ -432,7 +452,9 @@ def show_place(chat_id, user_id, message_id=None):
         bot.send_message(
             chat_id,
             "Нет доступных мест в этой категории.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("Меню"),
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
         )
         return
     idx = state["index"] % len(places)
@@ -442,24 +464,33 @@ def show_place(chat_id, user_id, message_id=None):
     kb = types.InlineKeyboardMarkup()
     kb.row(
         types.InlineKeyboardButton("⬅️", callback_data="prev"),
-        types.InlineKeyboardButton("В избранное", callback_data=f"fav_{place[0]}"),
+        types.InlineKeyboardButton(
+            "В избранное", callback_data=f"fav_{place[0]}"
+        ),
         types.InlineKeyboardButton("➡️", callback_data="next"),
     )
     kb.row(
         types.InlineKeyboardButton(
-            "Добавить комментарий", callback_data=f"add_comment_{place[0]}"
+            "Добавить отзыв", callback_data=f"add_comment_{place[0]}"
         ),
-        types.InlineKeyboardButton("Добавить оценку", callback_data=f"rate_{place[0]}"),
+        types.InlineKeyboardButton(
+            "Добавить оценку", callback_data=f"rate_{place[0]}"
+        ),
     )
     kb.add(
         types.InlineKeyboardButton("Уже был", callback_data=f"was_{place[0]}"),
-        types.InlineKeyboardButton("Отзывы", callback_data=f"get_summary_{place[0]}"),
+        types.InlineKeyboardButton(
+            "Комментарии", callback_data=f"get_summary_{place[0]}"
+        ),
     )
 
     if message_id:
         try:
             bot.edit_message_text(
-                chat_id=chat_id, message_id=message_id, text=caption, reply_markup=kb
+                chat_id=chat_id,
+                message_id=message_id,
+                text=caption,
+                reply_markup=kb,
             )
         except:
             bot.send_message(chat_id, caption, reply_markup=kb)
@@ -476,7 +507,9 @@ def show_favorites(chat_id, user_id, message_id=None):
         bot.send_message(
             chat_id,
             "Избранных мероприятий нет.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("Меню"),
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
         )
         return
     idx = state["index"] % len(places)
@@ -489,26 +522,33 @@ def show_favorites(chat_id, user_id, message_id=None):
         types.InlineKeyboardButton("Меню", callback_data="menu"),
         types.InlineKeyboardButton("➡️", callback_data="next"),
     )
-    kb.add(types.InlineKeyboardButton("Уже был", callback_data=f"was_{place[0]}"))
+    kb.add(
+        types.InlineKeyboardButton("Уже был", callback_data=f"was_{place[0]}")
+    )
 
     if message_id:
         try:
             bot.edit_message_text(
-                chat_id=chat_id, message_id=message_id, text=caption, reply_markup=kb
+                chat_id=chat_id,
+                message_id=message_id,
+                text=caption,
+                reply_markup=kb,
             )
         except:
             bot.send_message(chat_id, caption, reply_markup=kb)
     else:
         bot.send_message(chat_id, caption, reply_markup=kb)
 
+
 def show_keyboard(chat_id, message_text=None):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Название", "Категория", "Описание")
-    markup.add("Сохранить место")
+    markup.add("Сохранить место", "Отмена")
     if message_text:
         bot.send_message(chat_id, message_text, reply_markup=markup)
     else:
         bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
+
 
 @bot.message_handler(
     func=lambda m: m.chat.id in user_data
@@ -519,7 +559,9 @@ def ask_for_data(message):
     if message.text == "Название":
         user_data[user_id]["step"] = "name"
         bot.send_message(
-            user_id, "Введите название места:", reply_markup=types.ReplyKeyboardRemove()
+            user_id,
+            "Введите название места:",
+            reply_markup=types.ReplyKeyboardRemove(),
         )
     elif message.text == "Категория":
         user_data[user_id]["step"] = "type"
@@ -538,7 +580,18 @@ def ask_for_data(message):
 
 
 @bot.message_handler(
-    func=lambda m: m.chat.id in user_data and user_data.get(m.chat.id, {}).get("step")
+    func=lambda m: m.chat.id in user_data and m.text == "Отмена"
+)
+def cancel_adding(message):
+    user_id = message.chat.id
+    if user_id in user_data:
+        del user_data[user_id]
+    handle_menu(message)
+
+
+@bot.message_handler(
+    func=lambda m: m.chat.id in user_data
+    and user_data.get(m.chat.id, {}).get("step")
 )
 def save_data(message):
     user_id = message.chat.id
@@ -568,16 +621,17 @@ def save_place(message):
             reply_markup=types.ReplyKeyboardRemove(),
         )
         del user_data[user_id]
-        handle_start(message)
+        handle_menu(message)
     else:
         show_keyboard(user_id, "Ошибка сохранения. Попробуйте снова.")
 
-#Функция анализа комментария от пользователя
+
+# Функция анализа комментария от пользователя
 def analyze_komm(text):
     prompt = (
         f'Внимательно проанализируй следующий текст:\n"{text}"\n\n'
         "Если в тексте есть матерные или оскорбительные выражения, "
-        "нецезурная(ненормативная) лексика, слова выходящие из культурного лексикона (говно, скотина и так другие) или "
+        "нецезурная(ненормативная) лексика, слова выходящие из культурного лексикона или "
         "присутсвуют слова не имеющие смысл или не относящиеся к контексту, бессвязный набор русских или английских букв, которые невозможно "
         "интерпритировать как осмысленные слова, например,  ыалыоалоыаиб, саацащц, csnck, chsifcisfhcisufhr, sodcjnso, JGDf?, выа, "
         "оиРИПВИ св, курлык и аналогичные им, а также текст, который нельзя отнетсти к категории отзыва о месте то contains_profanity - true, иначе — false.\n"
@@ -595,11 +649,17 @@ def analyze_komm(text):
     }
     data = {
         "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
-        "completionOptions": {"stream": False, "temperature": 0.1, "maxTokens": 200},
+        "completionOptions": {
+            "stream": False,
+            "temperature": 0.1,
+            "maxTokens": 200,
+        },
         "messages": [{"role": "user", "text": prompt}],
     }
     try:
-        response = requests.post(config.API_ENDPOINT, json=data, headers=headers)
+        response = requests.post(
+            config.API_ENDPOINT, json=data, headers=headers
+        )
         if response.status_code != 200:
             logging.error(
                 f"Ошибка при запросе к YandexGPT. Статус код: {response.status_code}, Текст: {response.text}"
@@ -627,7 +687,8 @@ def get_reviews_summary(place_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT text, sentiment_score FROM comments WHERE place_id = ?", (place_id,)
+        "SELECT text, sentiment_score FROM comments WHERE place_id = ?",
+        (place_id,),
     )
     reviews = cursor.fetchall()
     conn.close()
@@ -665,11 +726,17 @@ def summarize_reviews(reviews, sentiment_type):
     }
     data = {
         "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
-        "completionOptions": {"stream": False, "temperature": 0.4, "maxTokens": 500},
+        "completionOptions": {
+            "stream": False,
+            "temperature": 0.4,
+            "maxTokens": 500,
+        },
         "messages": [{"role": "user", "text": prompt}],
     }
     try:
-        response = requests.post(config.API_ENDPOINT, json=data, headers=headers)
+        response = requests.post(
+            config.API_ENDPOINT, json=data, headers=headers
+        )
         response.raise_for_status()
         result = response.json()
         summary = result["result"]["alternatives"][0]["message"]["text"]
@@ -687,7 +754,9 @@ def handle_view_favorites(message):
         bot.send_message(
             message.chat.id,
             "Избранных мероприятий нет.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("Меню"),
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
         )
         return
     user_state[user_id] = {"view": "favorites", "index": 0}
@@ -729,7 +798,9 @@ def handle_callback(call):
         return
     elif data.startswith("add_comment_"):
         place_id = int(data.split("_")[2])
-        msg = bot.send_message(call.message.chat.id, "Напишите ваш комментарий:")
+        msg = bot.send_message(
+            call.message.chat.id, "Напишите ваш комментарий:"
+        )
         bot.register_next_step_handler(msg, process_comment_step, place_id)
         return
     elif data.startswith("get_summary_"):
@@ -761,7 +832,9 @@ def process_comment_step(message, place_id):
             "Ваш комментарий содержит недопустимый контент и не может быть сохранен.",
         )
     else:
-        add_comment_to_db(place_id, message.from_user.id, user_text, sentiment_score)
+        add_comment_to_db(
+            place_id, message.from_user.id, user_text, sentiment_score
+        )
         bot.send_message(message.chat.id, "Ваш комментарий успешно добавлен!")
 
 
@@ -775,7 +848,9 @@ def process_rating(message, place_id):
         else:
             bot.send_message(message.chat.id, "Введите число от 0 до 10.")
     except:
-        bot.send_message(message.chat.id, "Введите корректное число от 0 до 10.")
+        bot.send_message(
+            message.chat.id, "Введите корректное число от 0 до 10."
+        )
 
 
 # Запуск бота
