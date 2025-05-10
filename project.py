@@ -13,7 +13,7 @@ user_data = {}
 
 # Функция для подключения к базе данных
 def get_db_connection():
-    return sqlite3.connect("C:/Users/Redmi/OneDrive/Рабочий стол/pp/work_bd.db", check_same_thread=False)
+    return sqlite3.connect("/root/telegram_bot/work_bd.db", check_same_thread=False)
 
 
 # Функция регистрации пользователя
