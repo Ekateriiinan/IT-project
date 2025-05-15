@@ -5,6 +5,9 @@ import config
 import requests
 import json
 import logging
+import yadisk
+import time
+
 
 bot = telebot.TeleBot(config.TOKEN)
 user_state = {}
@@ -13,7 +16,8 @@ user_data = {}
 
 # Функция для подключения к базе данных
 def get_db_connection():
-    return sqlite3.connect("/root/telegram_bot/work_bd.db", check_same_thread=False)
+    return sqlite3.connect(
+"C:/Users/Redmi/OneDrive/Рабочий стол/pp/work_bd.db", check_same_thread=False)
 
 
 # Функция регистрации пользователя
@@ -57,7 +61,7 @@ def save_to_db_new_place(user_id):
         )
         data = user_data[user_id]
         cursor.execute(
-            "INSERT INTO places_events_na_proverky (name, type, description) VALUES (?, ?, ?)",
+            "INSERT INTO places_events (name, type, description) VALUES (?, ?, ?)",
             (data["name"], data["type"], data["description"]),
         )
         conn.commit()
@@ -270,7 +274,7 @@ def handle_start(message):
     markup.add("Добавить место", "Посмотреть избранное")
     bot.send_message(
         message.chat.id,
-        f"Привет, {message.from_user.first_name}! Я помогу подобрать место для досуга.\nЕсли хотите узнать про мероприятие подробнее и получить адрес, то просто напишите <Расскажи про (название места как в карточке)>.",
+        f"Привет, {message.from_user.first_name}. Я помогу подобрать место для досуга.\nЕсли хотите узнать про мероприятие подробнее и получить адрес, то просто напишите 🔍<Расскажи про (название места как в карточке)>",
         reply_markup=markup
     )
 
@@ -302,7 +306,7 @@ def handle_yandex_gpt_request(message):
                 "messages": [
                     {
                         "role": "user",
-                        "text": f"Расскажи максимально подробно про {place}. Укажи точный адрес и сформируй ссылку на Яндекс.Карты в формате: 'Ссылка на карты: https://yandex.ru/maps/?text={place}'",
+                        "text": f"Расскажи максимально подробно про {place}. Укажи точный адрес и сформируй ссылку на Яндекс.Карты в формате: '📍Ссылка на карты: https://yandex.ru/maps/?text={place}'",
                     }
                 ],
             },
@@ -329,7 +333,7 @@ def handle_find_place(message):
     markup.add("Прогулка", "Ресторан", "Меню")
     bot.send_message(
         message.chat.id,
-        "Куда бы вы хотели сходить? Посмотрите на кнопки ниже.",
+        "Куда бы вы хотели сходить🤔? \nВыберите кнопки ниже.",
         reply_markup=markup,
     )
 
@@ -341,7 +345,7 @@ def handle_menu(message):
     markup.add("Добавить место", "Посмотреть избранное")
     bot.send_message(
         message.chat.id,
-        f"Если хотите узнать про мероприятие подробнее и получить адрес, то просто напишите <Расскажи про (название места как в карточке)>.",
+        f"Если хотите узнать про мероприятие подробнее и получить адрес, то просто напишите 🔍<Расскажи про (название места как в карточке)>",
         reply_markup=markup,
     )
 
@@ -543,17 +547,69 @@ def show_favorites(chat_id, user_id, message_id=None):
 def show_keyboard(chat_id, message_text=None):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Название", "Категория", "Описание")
-    markup.add("Сохранить место", "Отмена")
+    markup.add("Добавить фото", "Сохранить место", "Отмена")
     if message_text:
         bot.send_message(chat_id, message_text, reply_markup=markup)
     else:
         bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
 
 
-@bot.message_handler(
-    func=lambda m: m.chat.id in user_data
-    and m.text in ["Название", "Категория", "Описание"]
-)
+def upload_photo_to_yandex_disk(file_url, user_id):
+    timestamp = int(time.time())
+    file_name = f"photo_{timestamp}.jpg"
+    folder_path = f"/TelegramBot/{user_id}/"
+    headers = {"Authorization": f"OAuth {config.YANDEX_DISK_TOKEN}"}
+    requests.put(
+        f"https://cloud-api.yandex.net/v1/disk/resources?path={folder_path}",
+        headers=headers
+    )
+    response = requests.post(
+        "https://cloud-api.yandex.net/v1/disk/resources/upload",
+        headers=headers,
+        params={
+            "path": f"{folder_path}{file_name}",
+            "url": file_url,
+            "overwrite": "true"
+        }
+    )
+    if response.status_code == 202:
+        return {'status': True, 'file_name': file_name}
+    else:
+        error = response.json().get('message', 'Unknown error')
+        return {'status': False, 'message': error}
+
+
+@bot.message_handler(content_types=['photo'])
+def handle_photos(message):
+    user_id = message.chat.id
+    if user_id not in user_data or user_data[user_id].get("step") != "photos":
+        bot.send_message(user_id, "Сначала нажмите 'Добавить фото' в меню")
+        return
+    try:
+        file_info = bot.get_file(message.photo[-1].file_id)
+        file_url = f"https://api.telegram.org/file/bot{bot.token}/{file_info.file_path}"
+        upload_result = upload_photo_to_yandex_disk(file_url, user_id)
+        if upload_result['status']:
+            if 'photos' not in user_data[user_id]:
+                user_data[user_id]['photos'] = []
+            user_data[user_id]['photos'].append(upload_result['file_name'])
+            bot.send_message(user_id,"Фото успешно загружено✔️")
+            show_keyboard(user_id)
+        else:
+            bot.send_message(
+                user_id,
+                f"Ошибка загрузки: {upload_result['message']}",
+                reply_markup=show_keyboard(user_id)
+            )
+    except Exception as e:
+        bot.send_message(
+            user_id,
+            f"Ошибка: {str(e)}",
+            reply_markup=show_keyboard(user_id)
+        )
+
+
+@bot.message_handler(func=lambda m: m.chat.id in user_data and m.text in ["Название", "Категория", "Описание"])
 def ask_for_data(message):
     user_id = message.chat.id
     if message.text == "Название":
@@ -574,46 +630,37 @@ def ask_for_data(message):
         user_data[user_id]["step"] = "description"
         bot.send_message(
             user_id,
-            "Введите описание места в формате 1-2 предложений с отличительными качествами места:",
+            "📝Введите описание места в формате 1-2 предложений с отличительными качествами места:",
             reply_markup=types.ReplyKeyboardRemove(),
         )
 
 
-@bot.message_handler(
-    func=lambda m: m.chat.id in user_data and m.text == "Отмена"
-)
+@bot.message_handler(func=lambda m: m.chat.id in user_data and m.text == "Добавить фото")
+def ask_for_photo(message):
+    user_id = message.chat.id
+    user_data[user_id]["step"] = "photos"
+    bot.send_message(
+        user_id,
+        "📷Отправьте фото места:",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+
+@bot.message_handler(func=lambda m: m.chat.id in user_data and m.text == "Отмена")
 def cancel_adding(message):
     user_id = message.chat.id
     if user_id in user_data:
         del user_data[user_id]
     handle_menu(message)
 
-
-@bot.message_handler(
-    func=lambda m: m.chat.id in user_data
-    and user_data.get(m.chat.id, {}).get("step")
-)
-def save_data(message):
-    user_id = message.chat.id
-    step = user_data[user_id]["step"]
-    user_data[user_id][step] = message.text
-    user_data[user_id]["step"] = None
-    show_keyboard(user_id, "Выберите следующее действие.")
-
-
-@bot.message_handler(
-    func=lambda m: m.chat.id in user_data and m.text == "Сохранить место"
-)
+@bot.message_handler(func=lambda m: m.chat.id in user_data and m.text == "Сохранить место")
 def save_place(message):
     user_id = message.chat.id
     if user_id not in user_data:
         return
-
     data = user_data[user_id]
     if None in [data["name"], data["type"], data["description"]]:
         show_keyboard(user_id, "Заполните все поля перед сохранением!")
         return
-
     if save_to_db_new_place(user_id):
         bot.send_message(
             user_id,
@@ -626,12 +673,20 @@ def save_place(message):
         show_keyboard(user_id, "Ошибка сохранения. Попробуйте снова.")
 
 
+@bot.message_handler(func=lambda m: m.chat.id in user_data and user_data.get(m.chat.id, {}).get("step"))
+def save_data(message):
+    user_id = message.chat.id
+    step = user_data[user_id]["step"]
+    user_data[user_id][step] = message.text
+    user_data[user_id]["step"] = None
+    show_keyboard(user_id, "Выберите следующее действие.")
+
 # Функция анализа комментария от пользователя
 def analyze_komm(text):
     prompt = (
         f'Внимательно проанализируй следующий текст:\n"{text}"\n\n'
         "Если в тексте есть матерные или оскорбительные выражения, "
-        "нецезурная(ненормативная) лексика, слова выходящие из культурного лексикона или "
+        "нецезурная(ненормативная) лексика, слова выходящие из культурного лексикона (скотина и так другие) или "
         "присутсвуют слова не имеющие смысл или не относящиеся к контексту, бессвязный набор русских или английских букв, которые невозможно "
         "интерпритировать как осмысленные слова, например,  ыалыоалоыаиб, саацащц, csnck, chsifcisfhcisufhr, sodcjnso, JGDf?, выа, "
         "оиРИПВИ св, курлык и аналогичные им, а также текст, который нельзя отнетсти к категории отзыва о месте то contains_profanity - true, иначе — false.\n"
@@ -799,7 +854,7 @@ def handle_callback(call):
     elif data.startswith("add_comment_"):
         place_id = int(data.split("_")[2])
         msg = bot.send_message(
-            call.message.chat.id, "Напишите ваш комментарий:"
+            call.message.chat.id, "✍️Напишите ваш комментарий:"
         )
         bot.register_next_step_handler(msg, process_comment_step, place_id)
         return
