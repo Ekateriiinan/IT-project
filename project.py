@@ -61,7 +61,7 @@ def save_to_db_new_place(user_id):
         )
         data = user_data[user_id]
         cursor.execute(
-            "INSERT INTO places_events (name, type, description) VALUES (?, ?, ?)",
+            "INSERT INTO places_events_na_proverky (name, type, description) VALUES (?, ?, ?)",
             (data["name"], data["type"], data["description"]),
         )
         conn.commit()
@@ -103,14 +103,17 @@ def get_places_by_type(user_id, place_type):
     cursor.execute("SELECT was FROM users WHERE user_id = ?", (user_id,))
     was_raw = cursor.fetchone()
     was = was_raw[0].split(",") if was_raw and was_raw[0] else []
-    cursor.execute(
-        """
-        SELECT id, name, description FROM places_events
-        WHERE type LIKE ?
-    """,
-        (f"%{place_type}%",),
-    )
-    places = [p for p in cursor.fetchall() if str(p[0]) not in was]
+
+    query = """
+        SELECT p.id, p.name, p.description, AVG(r.score) as avg_rating
+        FROM places_events p
+        LEFT JOIN ratings r ON p.id = r.place_id
+        WHERE p.type LIKE ?
+        GROUP BY p.id
+        ORDER BY avg_rating DESC NULLS LAST
+    """
+    cursor.execute(query, (f"%{place_type}%",))
+    places = [p[:3] for p in cursor.fetchall() if str(p[0]) not in was]
     conn.close()
     return places
 
@@ -553,7 +556,7 @@ def show_keyboard(chat_id, message_text=None):
     else:
         bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
 
-
+#Добавление фото от пользователя на яндекс диск
 def upload_photo_to_yandex_disk(file_url, user_id):
     timestamp = int(time.time())
     file_name = f"photo_{timestamp}.jpg"
@@ -748,15 +751,12 @@ def get_reviews_summary(place_id):
     reviews = cursor.fetchall()
     conn.close()
     if not reviews:
-        return "Нет отзывов для этого места."
+        return "Нет отзывов для этого места.", ""
     good_reviews = [r[0] for r in reviews if r[1] == 1]
     bad_reviews = [r[0] for r in reviews if r[1] == 2]
-
-    good_summary = summarize_reviews(good_reviews, "good")
-    bad_summary = summarize_reviews(bad_reviews, "bad")
-
+    good_summary = summarize_reviews(good_reviews, "good") if good_reviews else "Нет положительных отзывов"
+    bad_summary = summarize_reviews(bad_reviews, "bad") if bad_reviews else "Нет отрицательных отзывов"
     return good_summary, bad_summary
-
 
 def summarize_reviews(reviews, sentiment_type):
     if not reviews:
@@ -801,29 +801,12 @@ def summarize_reviews(reviews, sentiment_type):
         return f"Не удалось проанализировать {'положительные' if sentiment_type == 'good' else 'отрицательные'} отзывы."
 
 
-@bot.message_handler(func=lambda m: m.text == "Посмотреть избранное")
-def handle_view_favorites(message):
-    user_id = message.from_user.id
-    fav_list = get_favorites(user_id)
-    if not fav_list:
-        bot.send_message(
-            message.chat.id,
-            "Избранных мероприятий нет.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
-                "Меню"
-            ),
-        )
-        return
-    user_state[user_id] = {"view": "favorites", "index": 0}
-    show_favorites(message.chat.id, user_id)
-
 
 # Обработчик callback-запросов
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
     user_id = call.from_user.id
     data = call.data
-
     if data == "next":
         user_state[user_id]["index"] += 1
     elif data == "prev":
@@ -848,7 +831,7 @@ def handle_callback(call):
         return
     elif data.startswith("rate_"):
         place_id = int(data.split("_")[1])
-        bot.send_message(call.message.chat.id, "Оцените это место от 0 до 10")
+        bot.send_message(call.message.chat.id, "Оцените это место от 0 до 10 ★")
         bot.register_next_step_handler(call.message, process_rating, place_id)
         return
     elif data.startswith("add_comment_"):
@@ -860,13 +843,14 @@ def handle_callback(call):
         return
     elif data.startswith("get_summary_"):
         place_id = int(call.data.split("_")[2])
-        good_summary, bad_summary = get_reviews_summary(place_id)
-
-        response = f"\n✅ {good_summary}\n" f"\n❌ {bad_summary}\n"
-
+        summaries = get_reviews_summary(place_id)  # Получаем кортеж
+        if isinstance(summaries, tuple) and len(summaries) == 2:
+            good_summary, bad_summary = summaries
+            response = f"\n✅ {good_summary}\n\n❌ {bad_summary}\n"
+        else:
+            response = "Не удалось получить отзывы"
         bot.send_message(call.message.chat.id, response)
         return
-
     state = user_state.get(user_id, {})
     if state.get("view") == "was":
         show_was(call.message.chat.id, user_id, call.message.message_id)
