@@ -504,7 +504,7 @@ def show_place(chat_id, user_id, message_id=None):
     else:
         bot.send_message(chat_id, caption, reply_markup=kb)
 
-
+#Функция для показан избранного
 def show_favorites(chat_id, user_id, message_id=None):
     state = user_state.get(user_id)
     if not state or state.get("view") != "favorites":
@@ -610,8 +610,7 @@ def handle_photos(message):
             f"Ошибка: {str(e)}",
             reply_markup=show_keyboard(user_id)
         )
-
-
+#Добавления места
 @bot.message_handler(func=lambda m: m.chat.id in user_data and m.text in ["Название", "Категория", "Описание"])
 def ask_for_data(message):
     user_id = message.chat.id
