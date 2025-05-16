@@ -17,7 +17,7 @@ user_data = {}
 # Функция для подключения к базе данных
 def get_db_connection():
     return sqlite3.connect(
-"C:/Users/Redmi/OneDrive/Рабочий стол/pp/work_bd.db", check_same_thread=False)
+"/root/telegram_bot/work_bd.db", check_same_thread=False)
 
 
 # Функция регистрации пользователя
@@ -504,7 +504,7 @@ def show_place(chat_id, user_id, message_id=None):
     else:
         bot.send_message(chat_id, caption, reply_markup=kb)
 
-#Функция для показан избранного
+
 def show_favorites(chat_id, user_id, message_id=None):
     state = user_state.get(user_id)
     if not state or state.get("view") != "favorites":
@@ -610,7 +610,8 @@ def handle_photos(message):
             f"Ошибка: {str(e)}",
             reply_markup=show_keyboard(user_id)
         )
-#Добавления места
+
+
 @bot.message_handler(func=lambda m: m.chat.id in user_data and m.text in ["Название", "Категория", "Описание"])
 def ask_for_data(message):
     user_id = message.chat.id
@@ -749,12 +750,14 @@ def get_reviews_summary(place_id):
     )
     reviews = cursor.fetchall()
     conn.close()
-    if not reviews:
-        return "Нет отзывов для этого места.", ""
     good_reviews = [r[0] for r in reviews if r[1] == 1]
     bad_reviews = [r[0] for r in reviews if r[1] == 2]
-    good_summary = summarize_reviews(good_reviews, "good") if good_reviews else "Нет положительных отзывов"
-    bad_summary = summarize_reviews(bad_reviews, "bad") if bad_reviews else "Нет отрицательных отзывов"
+    if reviews:
+        good_summary = summarize_reviews(good_reviews, "good") if good_reviews else "Нет положительных отзывов"
+        bad_summary = summarize_reviews(bad_reviews, "bad") if bad_reviews else "Нет отрицательных отзывов"
+    else:
+        good_summary = "Нет положительных отзывов"
+        bad_summary = "Нет отрицательных отзывов"
     return good_summary, bad_summary
 
 def summarize_reviews(reviews, sentiment_type):
@@ -765,14 +768,14 @@ def summarize_reviews(reviews, sentiment_type):
             f"Проанализируй положительные отзывы о месте и выдели основные моменты:\n\n"
             f"Отзывы:\n{chr(10).join(reviews[:5])}\n\n"
             "Сделай тезисно краткий анализ, выделив основные преимущества, "
-            "которые отмечают посетители. Ответ должен быть структурированным и информативным."
+            "которые отмечают посетители. Ответ должен быть структурированным и информативным. Ответь в формате 'Основные положительные моменты:\n 1) ... \n2)... и так далее'"
         )
     else:
         prompt = (
             f"Проанализируй отрицательные отзывы о месте и выдели основные проблемы:\n\n"
             f"Отзывы:\n{chr(10).join(reviews[:5])}\n\n"
             "Сделай тезисно краткий анализ выделив основные недостатки, "
-            "которые отмечают посетители. Ответ должен быть конструктивным."
+            "которые отмечают посетители. Ответ должен быть конструктивным. Ответь в формате 'Основные отрицательные моменты:\n 1) ... \n2)... и так далее'"
         )
     headers = {
         "Authorization": f"Bearer {config.YANDEX_API_KEY}",
