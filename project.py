@@ -8,19 +8,15 @@ import logging
 import yadisk
 import time
 
-
 bot = telebot.TeleBot(config.TOKEN)
 user_state = {}
 user_data = {}
 
-
-# Функция для подключения к базе данных
+# Подключение к БД
 def get_db_connection():
-    return sqlite3.connect(
-"/root/telegram_bot/work_bd.db", check_same_thread=False)
+    return sqlite3.connect("/root/telegram_bot/work_bd.db", check_same_thread=False)
 
-
-# Функция регистрации пользователя
+# Регистрация пользователя
 def register_user(user_id, first_name):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -43,37 +39,29 @@ def register_user(user_id, first_name):
     conn.commit()
     conn.close()
 
-
-# Добавление в БД нового места
+# Сохранение нового места в БД
 def save_to_db_new_place(user_id):
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS places_events_na_proverky (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                type TEXT NOT NULL,
-                description TEXT NOT NULL
-            );
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
         """
-        )
-        data = user_data[user_id]
-        cursor.execute(
-            "INSERT INTO places_events_na_proverky (name, type, description) VALUES (?, ?, ?)",
-            (data["name"], data["type"], data["description"]),
-        )
-        conn.commit()
-        return True
-    except Exception as e:
-        print(f"Database error: {e}")
-        return False
-    finally:
-        conn.close()
+        CREATE TABLE IF NOT EXISTS places_events_na_proverky (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT NOT NULL
+        );
+    """
+    )
+    data = user_data[user_id]
+    cursor.execute(
+        "INSERT INTO places_events_na_proverky (name, type, description) VALUES (?, ?, ?)",
+        (data["name"], data["type"], data["description"]),
+    )
+    conn.commit()
+    return True
 
-
-# Добавление комментариев
+# Добавление комментария
 def add_comment_to_db(place_id, user_id, text, sentiment_score):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -94,31 +82,28 @@ def add_comment_to_db(place_id, user_id, text, sentiment_score):
     )
     conn.commit()
     conn.close()
+    return True
 
-
-# Функция получения мест по типу
+# Получение мест по типу
 def get_places_by_type(user_id, place_type):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT was FROM users WHERE user_id = ?", (user_id,))
     was_raw = cursor.fetchone()
     was = was_raw[0].split(",") if was_raw and was_raw[0] else []
-
     query = """
-        SELECT p.id, p.name, p.description, AVG(r.score) as avg_rating
-        FROM places_events p
-        LEFT JOIN ratings r ON p.id = r.place_id
-        WHERE p.type LIKE ?
-        GROUP BY p.id
-        ORDER BY avg_rating DESC NULLS LAST
-    """
+          SELECT p.id, p.name, p.description, AVG(r.score) as avg_rating
+          FROM places_events p
+          LEFT JOIN ratings r ON p.id = r.place_id
+          WHERE p.type LIKE ?
+          GROUP BY p.id
+          ORDER BY avg_rating DESC NULLS LAST
+      """
     cursor.execute(query, (f"%{place_type}%",))
     places = [p[:3] for p in cursor.fetchall() if str(p[0]) not in was]
     conn.close()
     return places
-
-
-# Функция получения списка посещенных мест
+# Получение списка посещенных мест
 def get_was_list(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -131,17 +116,16 @@ def get_was_list(user_id):
     placeholders = ",".join("?" for _ in was)
     cursor.execute(
         f"""
-        SELECT id, name, description FROM places_events
-        WHERE id IN ({placeholders})
-    """,
+            SELECT id, name, description FROM places_events
+            WHERE id IN ({placeholders})
+        """,
         was,
     )
     places = cursor.fetchall()
     conn.close()
     return places
 
-
-# Функция получения избранных мест
+# Получение избранных мест
 def get_favorites(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -154,17 +138,16 @@ def get_favorites(user_id):
     placeholders = ",".join("?" for _ in fav)
     cursor.execute(
         f"""
-        SELECT id, name, description FROM places_events
-        WHERE id IN ({placeholders})
-    """,
+            SELECT id, name, description FROM places_events
+            WHERE id IN ({placeholders})
+        """,
         fav,
     )
     places = cursor.fetchall()
     conn.close()
     return places
 
-
-# Функция отметки места как посещенного
+# Отметка места как посещенного
 def mark_as_visited(user_id, place_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -186,8 +169,7 @@ def mark_as_visited(user_id, place_id):
     conn.commit()
     conn.close()
 
-
-# Функция удаления отметки о посещении
+# Удаление отметки о посещении
 def unmark_as_visited(user_id, place_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -201,8 +183,7 @@ def unmark_as_visited(user_id, place_id):
     conn.commit()
     conn.close()
 
-
-# Функция добавления в избранное
+# Добавление в избранное
 def mark_as_favorite(user_id, place_id):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -218,7 +199,7 @@ def mark_as_favorite(user_id, place_id):
     conn.close()
 
 
-# Функция оценки места
+# Оценка места
 def rate_place(user_id, place_id, score):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -241,12 +222,10 @@ def rate_place(user_id, place_id, score):
     conn.commit()
     conn.close()
 
-
-# Функция получения средней оценки
+# Получение средней оценки
 def get_avg_rating(place_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-
     cursor.execute(
         "SELECT AVG(score) FROM ratings WHERE place_id = ?", (place_id,)
     )
@@ -256,156 +235,158 @@ def get_avg_rating(place_id):
         "SELECT COUNT(*) FROM ratings WHERE place_id = ?", (place_id,)
     )
     count = cursor.fetchone()[0]
-
     conn.close()
-
     if avg is None:
         return "Ещё нет оценок"
-
     stars = round(avg / 2)
     star_rating = "★" * stars + "☆" * (5 - stars)
-
     return f"{star_rating} {round(avg, 1)}/10 (оценок: {count})"
 
-
-# Обработчик команды /start
-@bot.message_handler(commands=["start"])
-def handle_start(message):
-    register_user(message.from_user.id, message.from_user.first_name)
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Найти место", "Уже был")
-    markup.add("Добавить место", "Посмотреть избранное")
-    bot.send_message(
-        message.chat.id,
-        f"Привет, {message.from_user.first_name}. Я помогу подобрать место для досуга.\nЕсли хотите узнать про мероприятие подробнее и получить адрес, то просто напишите 🔍<Расскажи про (название места как в карточке)>",
-        reply_markup=markup
+# Загрузка фото на Яндекс.Диск
+def upload_photo_to_yandex_disk(file_url, user_id):
+    timestamp = int(time.time())
+    file_name = f"photo_{timestamp}.jpg"
+    folder_path = f"/TelegramBot/{user_id}/"
+    headers = {"Authorization": f"OAuth {config.YANDEX_DISK_TOKEN}"}
+    requests.put(
+        f"https://cloud-api.yandex.net/v1/disk/resources?path={folder_path}",
+        headers=headers
     )
+    response = requests.post(
+        "https://cloud-api.yandex.net/v1/disk/resources/upload",
+        headers=headers,
+        params={
+            "path": f"{folder_path}{file_name}",
+            "url": file_url,
+            "overwrite": "true"
+        }
+    )
+    if response.status_code == 202:
+        return {'status': True, 'file_name': file_name}
+    else:
+        error = response.json().get('message', 'Unknown error')
+        return {'status': False, 'message': error}
 
-
-# Обработчик запросов к Yandex GPT (исправленная версия)
-@bot.message_handler(func=lambda m: m.text.lower().startswith("расскажи про "))
-def handle_yandex_gpt_request(message):
-    place = message.text[13:].strip()
-
-    if not place:
-        bot.reply_to(message, "Пожалуйста, укажите место после 'Расскажи про'")
-        return
-
+# Анализ комментария
+def analyze_komm(text):
+    prompt = (
+        f'Внимательно проанализируй следующий текст:\n"{text}"\n\n'
+        "Если в тексте есть матерные или оскорбительные выражения, "
+        "нецезурная(ненормативная) лексика, слова выходящие из культурного лексикона (скотина и так другие) или "
+        "присутсвуют слова не имеющие смысл или не относящиеся к контексту, бессвязный набор русских или английских букв, которые невозможно "
+        "интерпритировать как осмысленные слова, например,  ыалыоалоыаиб, саацащц, csnck, chsifcisfhcisufhr, sodcjnso, JGDf?, выа, "
+        "оиРИПВИ св, курлык и аналогичные им, а также текст, который нельзя отнетсти к категории отзыва о месте то contains_profanity - true, иначе — false.\n"
+        "Определи также тональность, если можно распознать смысл написанного и тональность позитивная пиши 1, "
+        "если негативная пиши 2\n\n"
+        "Ответь строго в формате JSON:\n"
+        "{\n"
+        '  "contains_profanity": true/false,\n'
+        '  "sentiment": "1/2"\n'
+        "}"
+    )
+    headers = {
+        "Authorization": f"Bearer {config.YANDEX_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
+        "completionOptions": {
+            "stream": False,
+            "temperature": 0.1,
+            "maxTokens": 200,
+        },
+        "messages": [{"role": "user", "text": prompt}],
+    }
     try:
         response = requests.post(
-            url="https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
-            headers={
-                "Authorization": f"Api-Key {config.YANDEX_API_KEY}",
-                "x-folder-id": config.YANDEX_FOLDER_ID,
-                "Content-Type": "application/json",
-            },
-            json={
-                "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
-                "completionOptions": {
-                    "stream": False,
-                    "temperature": 0.6,
-                    "maxTokens": "2000",
-                },
-                "messages": [
-                    {
-                        "role": "user",
-                        "text": f"Расскажи максимально подробно про {place}. Укажи точный адрес и сформируй ссылку на Яндекс.Карты в формате: '📍Ссылка на карты: https://yandex.ru/maps/?text={place}'",
-                    }
-                ],
-            },
+            config.API_ENDPOINT, json=data, headers=headers
         )
+        if response.status_code != 200:
+            logging.error(
+                f"Ошибка при запросе к YandexGPT. Статус код: {response.status_code}, Текст: {response.text}"
+            )
+            return False, -1
+        result = response.json()
+        output_text = (
+            result["result"]["alternatives"][0]["message"]["text"]
+            .strip()
+            .replace("```", "")
+            .strip()
+        )
+        logging.info(f"YandexGPT response: {output_text}")
+        analysis = json.loads(output_text)
+        sentiment = analysis.get("sentiment", "неизвестно")
+        contains_profanity = analysis.get("contains_profanity", False)
+        sentiment_score = int(sentiment) if sentiment in ("1", "2") else -1
+        return contains_profanity, sentiment_score
+    except Exception as e:
+        logging.error(f"Ошибка при анализе комментария: {e}")
+        return False, -1
 
+# Получение сводки отзывов
+def get_reviews_summary(place_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT text, sentiment_score FROM comments WHERE place_id = ?",
+        (place_id,),
+    )
+    reviews = cursor.fetchall()
+    conn.close()
+    good_reviews = [r[0] for r in reviews if r[1] == 1]
+    bad_reviews = [r[0] for r in reviews if r[1] == 2]
+    if reviews:
+        good_summary = summarize_reviews(good_reviews, "good") if good_reviews else "Нет положительных отзывов"
+        bad_summary = summarize_reviews(bad_reviews, "bad") if bad_reviews else "Нет отрицательных отзывов"
+    else:
+        good_summary = "Нет положительных отзывов"
+        bad_summary = "Нет отрицательных отзывов"
+    return good_summary, bad_summary
+
+# Анализ отзывов
+def summarize_reviews(reviews, sentiment_type):
+    if not reviews:
+        return f"Нет {'положительных' if sentiment_type == 'good' else 'отрицательных'} отзывов."
+    if sentiment_type == "good":
+        prompt = (
+            f"Проанализируй положительные отзывы о месте и выдели основные моменты:\n\n"
+            f"Отзывы:\n{chr(10).join(reviews[:5])}\n\n"
+            "Сделай тезисно краткий анализ, выделив основные преимущества, "
+            "которые отмечают посетители. Ответ должен быть структурированным и информативным. Ответь в формате 'Основные положительные моменты:\n 1) ... \n2)... и так далее'"
+        )
+    else:
+        prompt = (
+            f"Проанализируй отрицательные отзывы о месте и выдели основные проблемы:\n\n"
+            f"Отзывы:\n{chr(10).join(reviews[:5])}\n\n"
+            "Сделай тезисно краткий анализ выделив основные недостатки, "
+            "которые отмечают посетители. Ответ должен быть конструктивным. Ответь в формате 'Основные отрицательные моменты:\n 1) ... \n2)... и так далее'"
+        )
+    headers = {
+        "Authorization": f"Bearer {config.YANDEX_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
+        "completionOptions": {
+            "stream": False,
+            "temperature": 0.4,
+            "maxTokens": 500,
+        },
+        "messages": [{"role": "user", "text": prompt}],
+    }
+    try:
+        response = requests.post(
+            config.API_ENDPOINT, json=data, headers=headers
+        )
         response.raise_for_status()
         result = response.json()
-        answer = result["result"]["alternatives"][0]["message"]["text"]
-        bot.reply_to(message, answer)
-
+        summary = result["result"]["alternatives"][0]["message"]["text"]
+        return summary
     except Exception as e:
-        print(f"Ошибка при запросе к YandexGPT: {e}")
-        bot.reply_to(
-            message,
-            "Произошла ошибка при обработке запроса. Попробуйте позже.",
-        )
+        logging.error(f"Ошибка при генерации сводки: {e}")
+        return f"Не удалось проанализировать {'положительные' if sentiment_type == 'good' else 'отрицательные'} отзывы."
 
-
-# Остальные обработчики сообщений
-@bot.message_handler(func=lambda m: m.text == "Найти место")
-def handle_find_place(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Кино", "Театр", "Музей")
-    markup.add("Прогулка", "Ресторан", "Меню")
-    bot.send_message(
-        message.chat.id,
-        "Куда бы вы хотели сходить🤔? \nВыберите кнопки ниже.",
-        reply_markup=markup,
-    )
-
-
-@bot.message_handler(func=lambda m: m.text == "Меню")
-def handle_menu(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Найти место", "Уже был")
-    markup.add("Добавить место", "Посмотреть избранное")
-    bot.send_message(
-        message.chat.id,
-        f"Если хотите узнать про мероприятие подробнее и получить адрес, то просто напишите 🔍<Расскажи про (название места как в карточке)>",
-        reply_markup=markup,
-    )
-
-
-@bot.message_handler(func=lambda m: m.text == "Уже был")
-def handle_was_list(message):
-    user_id = message.from_user.id
-    user_state[user_id] = {"view": "was", "index": 0}
-    show_was(message.chat.id, user_id)
-
-
-@bot.message_handler(func=lambda m: m.text == "Добавить место")
-def insert_place(message):
-    user_id = message.from_user.id
-    user_data[user_id] = {
-        "name": None,
-        "type": None,
-        "description": None,
-        "step": None,
-    }
-    show_keyboard(
-        message.chat.id,
-        "Для внесения места добавьте информацию о месте в соотвествии с предложенными кнопками.",
-    )
-
-
-@bot.message_handler(func=lambda m: m.text == "Посмотреть избранное")
-def handle_view_favorites(message):
-    user_id = message.from_user.id
-    fav_list = get_favorites(user_id)
-    if not fav_list:
-        bot.send_message(
-            message.chat.id,
-            "Избранных мероприятий нет.",
-            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
-                "Меню"
-            ),
-        )
-        return
-    user_state[user_id] = {"view": "favorites", "index": 0}
-    show_favorites(message.chat.id, user_id)
-
-
-@bot.message_handler(
-    func=lambda m: m.text in ["Кино", "Театр", "Музей", "Прогулка", "Ресторан"]
-)
-def handle_category(message):
-    user_id = message.from_user.id
-    user_state[user_id] = {
-        "view": "browse",
-        "category": message.text.lower(),
-        "index": 0,
-    }
-    show_place(message.chat.id, user_id)
-
-
-# Функции отображения информации
+# Показать посещенные места
 def show_was(chat_id, user_id, message_id=None):
     state = user_state.get(user_id)
     if not state or state.get("view") != "was":
@@ -434,6 +415,60 @@ def show_was(chat_id, user_id, message_id=None):
         types.InlineKeyboardButton(
             "Убрать из уже был", callback_data=f"unwas_{place[0]}"
         )
+    )
+    if message_id:
+        try:
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=caption,
+                reply_markup=kb,
+            )
+        except:
+            bot.send_message(chat_id, caption, reply_markup=kb)
+    else:
+        bot.send_message(chat_id, caption, reply_markup=kb)
+
+
+def show_place(chat_id, user_id, message_id=None):
+    state = user_state.get(user_id)
+    if not state or state.get("view") != "browse":
+        return
+    places = get_places_by_type(user_id, state["category"])
+    if not places:
+        bot.send_message(
+            chat_id,
+            "Нет доступных мест в этой категории.",
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
+        )
+        return
+    idx = state["index"] % len(places)
+    place = places[idx]
+    rating = get_avg_rating(place[0])
+    caption = f"{place[1]}\n\n{place[2]}\n\nРейтинг: {rating}"
+    kb = types.InlineKeyboardMarkup()
+    kb.row(
+        types.InlineKeyboardButton("⬅️", callback_data="prev"),
+        types.InlineKeyboardButton(
+            "В избранное", callback_data=f"fav_{place[0]}"
+        ),
+        types.InlineKeyboardButton("➡️", callback_data="next"),
+    )
+    kb.row(
+        types.InlineKeyboardButton(
+            "Добавить отзыв", callback_data=f"add_comment_{place[0]}"
+        ),
+        types.InlineKeyboardButton(
+            "Добавить оценку", callback_data=f"rate_{place[0]}"
+        ),
+    )
+    kb.add(
+        types.InlineKeyboardButton("Уже был", callback_data=f"was_{place[0]}"),
+        types.InlineKeyboardButton(
+            "Комментарии", callback_data=f"get_summary_{place[0]}"
+        ),
     )
 
     if message_id:
@@ -504,7 +539,7 @@ def show_place(chat_id, user_id, message_id=None):
     else:
         bot.send_message(chat_id, caption, reply_markup=kb)
 
-
+# Показать избранное
 def show_favorites(chat_id, user_id, message_id=None):
     state = user_state.get(user_id)
     if not state or state.get("view") != "favorites":
@@ -546,7 +581,7 @@ def show_favorites(chat_id, user_id, message_id=None):
     else:
         bot.send_message(chat_id, caption, reply_markup=kb)
 
-
+# Показ клавиатуры
 def show_keyboard(chat_id, message_text=None):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Название", "Категория", "Описание")
@@ -556,32 +591,137 @@ def show_keyboard(chat_id, message_text=None):
     else:
         bot.send_message(chat_id, "Выберите действие:", reply_markup=markup)
 
-#Добавление фото от пользователя на яндекс диск
-def upload_photo_to_yandex_disk(file_url, user_id):
-    timestamp = int(time.time())
-    file_name = f"photo_{timestamp}.jpg"
-    folder_path = f"/TelegramBot/{user_id}/"
-    headers = {"Authorization": f"OAuth {config.YANDEX_DISK_TOKEN}"}
-    requests.put(
-        f"https://cloud-api.yandex.net/v1/disk/resources?path={folder_path}",
-        headers=headers
+# Обработчик /start
+@bot.message_handler(commands=["start"])
+def handle_start(message):
+    register_user(message.from_user.id, message.from_user.first_name)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Найти место", "Уже был")
+    markup.add("Добавить место", "Посмотреть избранное")
+    bot.send_message(
+        message.chat.id,
+        f"Привет, {message.from_user.first_name}. Я помогу подобрать место для досуга.\nЕсли хотите узнать про мероприятие подробнее и получить адрес, то просто напишите 🔍<Расскажи про (название места как в карточке)>",
+        reply_markup=markup
     )
-    response = requests.post(
-        "https://cloud-api.yandex.net/v1/disk/resources/upload",
-        headers=headers,
-        params={
-            "path": f"{folder_path}{file_name}",
-            "url": file_url,
-            "overwrite": "true"
-        }
-    )
-    if response.status_code == 202:
-        return {'status': True, 'file_name': file_name}
-    else:
-        error = response.json().get('message', 'Unknown error')
-        return {'status': False, 'message': error}
+
+# Обработчик запросов к Yandex GPT
+@bot.message_handler(func=lambda m: m.text.lower().startswith("расскажи про "))
+def handle_yandex_gpt_request(message):
+    place = message.text[13:].strip()
+    if not place:
+        bot.reply_to(message, "Пожалуйста, укажите место после 'Расскажи про'")
+        return
+    try:
+        response = requests.post(
+            url="https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
+            headers={
+                "Authorization": f"Api-Key {config.YANDEX_API_KEY}",
+                "x-folder-id": config.YANDEX_FOLDER_ID,
+                "Content-Type": "application/json",
+            },
+            json={
+                "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
+                "completionOptions": {
+                    "stream": False,
+                    "temperature": 0.6,
+                    "maxTokens": "2000",
+                },
+                "messages": [
+                    {
+                        "role": "user",
+                        "text": f"Расскажи максимально подробно про {place}. Укажи точный адрес и сформируй ссылку на Яндекс.Карты в формате: '📍Ссылка на карты: https://yandex.ru/maps/?text={place}'",
+                    }
+                ],
+            },
+        )
+        response.raise_for_status()
+        result = response.json()
+        answer = result["result"]["alternatives"][0]["message"]["text"]
+        bot.reply_to(message, answer)
+    except Exception as e:
+        print(f"Ошибка при запросе к YandexGPT: {e}")
+        bot.reply_to(
+            message,
+            "Произошла ошибка при обработке запроса. Попробуйте позже.",
+        )
 
 
+# Обработчик "Найти место"
+@bot.message_handler(func=lambda m: m.text == "Найти место")
+def handle_find_place(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Кино", "Театр", "Музей")
+    markup.add("Прогулка", "Ресторан", "Меню")
+    bot.send_message(
+        message.chat.id,
+        "Куда бы вы хотели сходить🤔? \nВыберите кнопки ниже.",
+        reply_markup=markup,
+    )
+
+# Обработчик "Меню"
+@bot.message_handler(func=lambda m: m.text == "Меню")
+def handle_menu(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Найти место", "Уже был")
+    markup.add("Добавить место", "Посмотреть избранное")
+    bot.send_message(
+        message.chat.id,
+        f"Если хотите узнать про мероприятие подробнее и получить адрес, то просто напишите 🔍<Расскажи про (название места как в карточке)>",
+        reply_markup=markup,
+    )
+
+# Обработчик "Уже был"
+@bot.message_handler(func=lambda m: m.text == "Уже был")
+def handle_was_list(message):
+    user_id = message.from_user.id
+    user_state[user_id] = {"view": "was", "index": 0}
+    show_was(message.chat.id, user_id)
+
+# Обработчик "Добавить место"
+@bot.message_handler(func=lambda m: m.text == "Добавить место")
+def insert_place(message):
+    user_id = message.from_user.id
+    user_data[user_id] = {
+        "name": None,
+        "type": None,
+        "description": None,
+        "step": None,
+    }
+    show_keyboard(
+        message.chat.id,
+        "Для внесения места добавьте информацию о месте в соотвествии с предложенными кнопками.",
+    )
+
+# Обработчик "Посмотреть избранное"
+@bot.message_handler(func=lambda m: m.text == "Посмотреть избранное")
+def handle_view_favorites(message):
+    user_id = message.from_user.id
+    fav_list = get_favorites(user_id)
+    if not fav_list:
+        bot.send_message(
+            message.chat.id,
+            "Избранных мероприятий нет.",
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add(
+                "Меню"
+            ),
+        )
+        return
+    user_state[user_id] = {"view": "favorites", "index": 0}
+    show_favorites(message.chat.id, user_id)
+
+
+# Обработчик категорий
+@bot.message_handler(func=lambda m: m.text in ["Кино", "Театр", "Музей", "Прогулка", "Ресторан"])
+def handle_category(message):
+    user_id = message.from_user.id
+    user_state[user_id] = {
+        "view": "browse",
+        "category": message.text.lower(),
+        "index": 0,
+    }
+    show_place(message.chat.id, user_id)
+
+# Обработчик фото
 @bot.message_handler(content_types=['photo'])
 def handle_photos(message):
     user_id = message.chat.id
@@ -596,7 +736,7 @@ def handle_photos(message):
             if 'photos' not in user_data[user_id]:
                 user_data[user_id]['photos'] = []
             user_data[user_id]['photos'].append(upload_result['file_name'])
-            bot.send_message(user_id,"Фото успешно загружено✔️")
+            bot.send_message(user_id, "Фото успешно загружено✔️")
             show_keyboard(user_id)
         else:
             bot.send_message(
@@ -611,7 +751,7 @@ def handle_photos(message):
             reply_markup=show_keyboard(user_id)
         )
 
-
+# Обработчик данных места
 @bot.message_handler(func=lambda m: m.chat.id in user_data and m.text in ["Название", "Категория", "Описание"])
 def ask_for_data(message):
     user_id = message.chat.id
@@ -637,7 +777,7 @@ def ask_for_data(message):
             reply_markup=types.ReplyKeyboardRemove(),
         )
 
-
+# Обработчик "Добавить фото"
 @bot.message_handler(func=lambda m: m.chat.id in user_data and m.text == "Добавить фото")
 def ask_for_photo(message):
     user_id = message.chat.id
@@ -648,6 +788,7 @@ def ask_for_photo(message):
         reply_markup=types.ReplyKeyboardRemove()
     )
 
+# Обработчик "Отмена"
 @bot.message_handler(func=lambda m: m.chat.id in user_data and m.text == "Отмена")
 def cancel_adding(message):
     user_id = message.chat.id
@@ -655,6 +796,7 @@ def cancel_adding(message):
         del user_data[user_id]
     handle_menu(message)
 
+# Обработчик "Сохранить место"
 @bot.message_handler(func=lambda m: m.chat.id in user_data and m.text == "Сохранить место")
 def save_place(message):
     user_id = message.chat.id
@@ -675,7 +817,7 @@ def save_place(message):
     else:
         show_keyboard(user_id, "Ошибка сохранения. Попробуйте снова.")
 
-
+# Обработчик ввода данных
 @bot.message_handler(func=lambda m: m.chat.id in user_data and user_data.get(m.chat.id, {}).get("step"))
 def save_data(message):
     user_id = message.chat.id
@@ -684,127 +826,7 @@ def save_data(message):
     user_data[user_id]["step"] = None
     show_keyboard(user_id, "Выберите следующее действие.")
 
-# Функция анализа комментария от пользователя
-def analyze_komm(text):
-    prompt = (
-        f'Внимательно проанализируй следующий текст:\n"{text}"\n\n'
-        "Если в тексте есть матерные или оскорбительные выражения, "
-        "нецезурная(ненормативная) лексика, слова выходящие из культурного лексикона (скотина и так другие) или "
-        "присутсвуют слова не имеющие смысл или не относящиеся к контексту, бессвязный набор русских или английских букв, которые невозможно "
-        "интерпритировать как осмысленные слова, например,  ыалыоалоыаиб, саацащц, csnck, chsifcisfhcisufhr, sodcjnso, JGDf?, выа, "
-        "оиРИПВИ св, курлык и аналогичные им, а также текст, который нельзя отнетсти к категории отзыва о месте то contains_profanity - true, иначе — false.\n"
-        "Определи также тональность, если можно распознать смысл написанного и тональность позитивная пиши 1, "
-        "если негативная пиши 2\n\n"
-        "Ответь строго в формате JSON:\n"
-        "{\n"
-        '  "contains_profanity": true/false,\n'
-        '  "sentiment": "1/2"\n'
-        "}"
-    )
-    headers = {
-        "Authorization": f"Bearer {config.YANDEX_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    data = {
-        "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
-        "completionOptions": {
-            "stream": False,
-            "temperature": 0.1,
-            "maxTokens": 200,
-        },
-        "messages": [{"role": "user", "text": prompt}],
-    }
-    try:
-        response = requests.post(
-            config.API_ENDPOINT, json=data, headers=headers
-        )
-        if response.status_code != 200:
-            logging.error(
-                f"Ошибка при запросе к YandexGPT. Статус код: {response.status_code}, Текст: {response.text}"
-            )
-            return False, -1
-        result = response.json()
-        output_text = (
-            result["result"]["alternatives"][0]["message"]["text"]
-            .strip()
-            .replace("```", "")
-            .strip()
-        )
-        logging.info(f"YandexGPT response: {output_text}")
-        analysis = json.loads(output_text)
-        sentiment = analysis.get("sentiment", "неизвестно")
-        contains_profanity = analysis.get("contains_profanity", False)
-        sentiment_score = int(sentiment) if sentiment in ("1", "2") else -1
-        return contains_profanity, sentiment_score
-    except Exception as e:
-        logging.error(f"Ошибка при анализе комментария: {e}")
-        return False, -1
-
-
-def get_reviews_summary(place_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT text, sentiment_score FROM comments WHERE place_id = ?",
-        (place_id,),
-    )
-    reviews = cursor.fetchall()
-    conn.close()
-    good_reviews = [r[0] for r in reviews if r[1] == 1]
-    bad_reviews = [r[0] for r in reviews if r[1] == 2]
-    if reviews:
-        good_summary = summarize_reviews(good_reviews, "good") if good_reviews else "Нет положительных отзывов"
-        bad_summary = summarize_reviews(bad_reviews, "bad") if bad_reviews else "Нет отрицательных отзывов"
-    else:
-        good_summary = "Нет положительных отзывов"
-        bad_summary = "Нет отрицательных отзывов"
-    return good_summary, bad_summary
-
-def summarize_reviews(reviews, sentiment_type):
-    if not reviews:
-        return f"Нет {'положительных' if sentiment_type == 'good' else 'отрицательных'} отзывов."
-    if sentiment_type == "good":
-        prompt = (
-            f"Проанализируй положительные отзывы о месте и выдели основные моменты:\n\n"
-            f"Отзывы:\n{chr(10).join(reviews[:5])}\n\n"
-            "Сделай тезисно краткий анализ, выделив основные преимущества, "
-            "которые отмечают посетители. Ответ должен быть структурированным и информативным. Ответь в формате 'Основные положительные моменты:\n 1) ... \n2)... и так далее'"
-        )
-    else:
-        prompt = (
-            f"Проанализируй отрицательные отзывы о месте и выдели основные проблемы:\n\n"
-            f"Отзывы:\n{chr(10).join(reviews[:5])}\n\n"
-            "Сделай тезисно краткий анализ выделив основные недостатки, "
-            "которые отмечают посетители. Ответ должен быть конструктивным. Ответь в формате 'Основные отрицательные моменты:\n 1) ... \n2)... и так далее'"
-        )
-    headers = {
-        "Authorization": f"Bearer {config.YANDEX_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    data = {
-        "modelUri": f"gpt://{config.YANDEX_FOLDER_ID}/yandexgpt-lite",
-        "completionOptions": {
-            "stream": False,
-            "temperature": 0.4,
-            "maxTokens": 500,
-        },
-        "messages": [{"role": "user", "text": prompt}],
-    }
-    try:
-        response = requests.post(
-            config.API_ENDPOINT, json=data, headers=headers
-        )
-        response.raise_for_status()
-        result = response.json()
-        summary = result["result"]["alternatives"][0]["message"]["text"]
-        return summary
-    except Exception as e:
-        logging.error(f"Ошибка при генерации сводки: {e}")
-        return f"Не удалось проанализировать {'положительные' if sentiment_type == 'good' else 'отрицательные'} отзывы."
-
-
-
-# Обработчик callback-запросов
+# Основной обработчик callback
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
     user_id = call.from_user.id
@@ -861,12 +883,10 @@ def handle_callback(call):
     else:
         show_place(call.message.chat.id, user_id, call.message.message_id)
 
-
-# Функцияm ответа на комментарий
+# Обработка комментария
 def process_comment_step(message, place_id):
     user_text = message.text
     contains_profanity, sentiment_score = analyze_komm(user_text)
-
     if contains_profanity:
         bot.send_message(
             message.chat.id,
@@ -878,8 +898,7 @@ def process_comment_step(message, place_id):
         )
         bot.send_message(message.chat.id, "Ваш комментарий успешно добавлен!")
 
-
-# Функция обработки оценки
+# Обработка оценки
 def process_rating(message, place_id):
     try:
         score = int(message.text)
@@ -893,8 +912,6 @@ def process_rating(message, place_id):
             message.chat.id, "Введите корректное число от 0 до 10."
         )
 
-
-# Запуск бота
 if __name__ == "__main__":
     print("Бот запущен...")
     bot.polling(non_stop=True)
